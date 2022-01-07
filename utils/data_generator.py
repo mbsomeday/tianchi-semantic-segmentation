@@ -1,112 +1,108 @@
 from tensorflow.python.keras.preprocessing.image import Iterator
-import numpy as np
 import pandas as pd
-import os
+import numpy as np
 from keras_applications import imagenet_utils
+
 
 from utils.uitls import *
 
 
 class DataIterator(Iterator):
     def __init__(self,
-                image_data_generator,
-                csv_path,
-                trainingData_path,
-                num_classes,
-                batch_size,
-                target_size,
-                shuffle=True,
-                seed=None,
-                data_aug_rate=0.
-                ):
-        self.image_data_generator = image_data_generator
+                 generator=None,
+                 csv_path=None,
+                 data_path=None,
+                 num_classes=None,
+                 batch_size=None,
+                 target_size=None,
+                 shuffle=True,
+                 seed=None
+                 ):
+        self.generator = generator
         self.csv_path = csv_path
-        self.trainingData_path = trainingData_path
+        self.data_path = data_path
+        self.batch_size = batch_size
         self.num_classes = num_classes
         self.target_size = target_size
-        self.data_aug_rate = data_aug_rate
-        self.train_mask, num_images = self._getlen_()
-        
-        super(DataIterator, self).__init__(num_images, batch_size, shuffle, seed)
-        
-    def _getlen_(self):
+        self.shuffle = shuffle
+        self.seed = seed
+        self.train_mask, self.num_samples = self._getinfo()
+        super(DataIterator, self).__init__(self.num_samples, self.batch_size, self.shuffle, self.seed)
+    
+    def _getinfo(self):
         train_mask = pd.read_csv(self.csv_path, sep='\t', names=['name', 'mask'])
-        leng = len(train_mask)
-        return train_mask, leng
-        
+        num_samples = len(train_mask)
+        return train_mask, num_samples
+    
     def _get_batches_of_transformed_samples(self, index_array):
         X = np.zeros(shape=(len(index_array), ) + self.target_size + (3, ))
-        Y = np.zeros(shape=(len(index_array), ) + self.target_size + (self.num_classes, ))
-
+        Y = np.zeros(shape=(len(index_array),) + self.target_size + (self.num_classes, ))
+        
         for i, imgIdx in enumerate(index_array):
-            image, label = load_imageAndMask(self.train_mask, self.trainingData_path, imgIdx)
+            image, label = load_image_label(self.train_mask, self.data_path, imgIdx)
+            if self.generator.random_crop:
+                image, label = crop_image(image=image, label=label, cropped_size=self.target_size)
+            else:
+                image, label = resize_image(image=image, label=label, target_size=self.target_size)
+                
+            #     TODO 这里可以做一些flip、brightness等操作
             
-            image, label = resize_image(image, label, self.target_size)
-            
-            #  todo: data augmentation
-            
+            label = one_hot(label=label, num_classes=self.num_classes)
             image = imagenet_utils.preprocess_input(image.astype("float32"), data_format="channels_last",
                                                     mode="torch")
-            label = one_hot(label, self.num_classes)
-            
-            X[i], Y[i] = image, label
+            X[i] = image
+            Y[i] = label
             
         return X, Y
-            
-        
-class ImageDataenerator():
+    
+    
+class ImageDataGenerator():
     def __init__(self,
-                 csv_path,
-                 trainingData_path,
                  random_crop=False,
                  rotation_rang=0,
-                 brightnese_range=None,
+                 brightness_range=None,
                  zoom_range=0.0,
                  channel_shift_range=0.0,
                  horizontal_flip=False,
-                 vertical_flip=False):
-        self.csv_path = csv_path
-        self.trainingData_path = trainingData_path
+                 vertical_flip=False
+                 ):
         self.random_crop = random_crop
-        self.rotation_rane = rotation_rang
-        self.brightness_range = brightnese_range
+        self.rotation_rang = rotation_rang
+        self.brightness_range = brightness_range
         self.zoom_range = zoom_range
         self.channel_shift_range = channel_shift_range
         self.horizontal_flip = horizontal_flip
         self.vertical_flip = vertical_flip
-        
+    
     def flow(self,
-             num_classes,
-             batch_size,
-             target_size,
+             csv_path=None,
+             data_path=None,
+             num_classes=None,
+             batch_size=None,
+             target_size=None,
              shuffle=True,
-             seed=None,
-             data_aug_rate=0.
+             seed=None
              ):
-        return DataIterator(image_data_generator=self,
-                            csv_path=self.csv_path,
-                            trainingData_path=self.trainingData_path,
+        '''
+        
+        :param csv_path:
+        :param data_path:
+        :param num_classes:
+        :param batch_size:
+        :param target_size: (h, w)
+        :param shuffle:
+        :param seed:
+        :return:
+        '''
+        return DataIterator(generator=self,
+                            csv_path=csv_path,
+                            data_path=data_path,
                             num_classes=num_classes,
                             batch_size=batch_size,
                             target_size=target_size,
                             shuffle=shuffle,
-                            seed=seed,
-                            data_aug_rate=data_aug_rate
+                            seed=seed
                             )
-
-
-if __name__ == '__main__':
-    a = [4,5,6,7]
-    for i, idx in enumerate(a):
-        print('i:', i, ', idx:', idx)
-
-
-
-
-
-
-
-
 
 
 

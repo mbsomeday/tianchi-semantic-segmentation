@@ -3,7 +3,7 @@ from models import *
 
 layers = tf.keras.layers
 
-def builder(num_classes, input_size=(256, 256), model='FCN-8', base_model='VGG'):
+def builder(num_classes, input_size=(256, 256), model='FCN-8', base_model='VGG16'):
     models = {
         'FCN-8S': FCN,
         'FCN-16s': FCN,
